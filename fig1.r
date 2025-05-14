@@ -32,7 +32,6 @@ seurat_list <- list()
 for (sample in samples) {
   print(sample)
   seurat_data <- Read10X(data.dir = sample, gene.column = 1)
-  # 使用文件夹名称作为项目名称
   seurat_obj <- CreateSeuratObject(counts = seurat_data, 
                                    project = sample, 
                                    min.features = 200, 
