@@ -1,6 +1,6 @@
 
 rm(list=ls())
-setwd("/home/zhangxp/testt")
+setwd("/home/zhangxp/")
 ###########lib############
 library(limma)
 library(Seurat)
@@ -29,31 +29,27 @@ samples <- setdiff(samples, to_remove)
 samples
 
 seurat_list <- list()
-# 遍历样本列表
 for (sample in samples) {
   print(sample)
   seurat_data <- Read10X(data.dir = sample, gene.column = 1)
   # 使用文件夹名称作为项目名称
   seurat_obj <- CreateSeuratObject(counts = seurat_data, 
-                                   project = sample,  # 保留完整的 sample 名称
+                                   project = sample, 
                                    min.features = 200, 
                                    min.cells = 3)
   print(head(rownames(seurat_obj,10)))
   seurat_list <- append(seurat_list, seurat_obj)}
 
-# 合并所有样本
 seurat_combined <- merge(seurat_list[[1]],
                          y = seurat_list[-1],
-                         add.cell.ids = samples)  # 使用 samples 中的完整名称
+                         add.cell.ids = samples)
 
 pbmc <- JoinLayers(seurat_combined)
-# 替换 Seurat 对象中的行名，去掉 "-1"
 pbmc@meta.data$orig.ident <- row.names(pbmc@meta.data)
 pbmc@meta.data$orig.ident <-  gsub("-1$", "", pbmc@meta.data$orig.ident)
 pbmc@meta.data$orig.ident <- gsub("^(.*)_(.*)_.*$", "\\1_\\2", pbmc@meta.data$orig.ident)
 
 dim(pbmc)
-
 table(pbmc@meta.data$orig.ident)
 DefaultAssay(pbmc)
 dim(pbmc)
@@ -62,29 +58,21 @@ dim(pbmc)
 
 ############QC#####
 #pbmc <- readRDS("pbmc_raw.rds")
-# 计算线粒体基因比例
 mito_genes <- rownames(pbmc)[grep("^MT-", rownames(pbmc))]
-#线粒休基因比例
 pbmc[["percent.mt"]]<- PercentageFeatureSet(pbmc, pattern = "^MT-")
-
-# 计算核糖体基因比例
 ribo_genes <- rownames(pbmc)[grep("^RP[SL]", rownames(pbmc), ignore.case = TRUE)]
 pbmc[["percent.ribo"]] <- PercentageFeatureSet(pbmc, pattern = "^RP[SL]")
-
-# 计算红血细胞基因比例
 hb_genes <- rownames(pbmc)[grep("^HB", rownames(pbmc))]
 pbmc[["percent.hb"]]  <- PercentageFeatureSet(pbmc, pattern = "^HB")
 head(pbmc@meta.data)
 
-#设置质控标准#基因
 minGene=300
 maxGene=6500
 minUMI=600
-pctMT=20#线粒体
-pctHB=0.2#血细胞
-pctRIB=40#核糖体
+pctMT=20
+pctHB=0.2
+pctRIB=40
 
-#数据质控并绘制小提琴图
 pbmc_filter <- subset(pbmc,subset = nFeature_RNA > minGene & nFeature_RNA <maxGene &
                         nCount_RNA > minUMI & percent.mt < pctMT & percent.hb < pctHB & percent.ribo < pctRIB)
 table(pbmc_filter@meta.data$orig.ident)
@@ -143,7 +131,6 @@ pbmc1@meta.data$celltype[pbmc1@meta.data$celltype == "Tissue_stem_cells" ] <- "F
 pbmc1@meta.data$celltype[pbmc1@meta.data$celltype == "Monocyte" ] <- "Macrophage"
 pbmc1@meta.data$celltype[pbmc1@meta.data$celltype == "MSC" ] <- "Epithelial_cells"
 
-# 定义基因名称向量
 gene_names <- c(
   "CD79A", "IGHG4", "IGKC", "JCHAIN", ###B CELL
   "CLDN5", "PECAM1", "VWF", ###Endothelial cell
@@ -163,29 +150,21 @@ DotPlot(pbmc1, features = gene_names, group.by = "celltype") +
 
 ##############1c
 
-# 加载 ggplot2 包
 library(ggplot2)
-
-# 使用 table 函数计算细胞类型的频率
 cell_type_freq <- table(pbmc1@meta.data$celltype)
-
-# 将频率转换为 data.frame
 cell_type_freq_df <- data.frame(celltype = names(cell_type_freq), freq = as.numeric(cell_type_freq))
-
-# 指定颜色
 color_vector <- c("#9c8a86","#c893c6","#a85343","#80a589","#e4db95","#6badd5","#ffcaff","#dccbd6")
 
-# 画一个横向柱状图
 ggplot(cell_type_freq_df, aes(x = freq, y = reorder(celltype, freq), fill = factor(celltype))) + 
   geom_col() + 
   geom_text(aes(label = freq), hjust = 0, size = 4, color = "black") + 
   scale_fill_manual(values = color_vector) + 
   labs(title = "Cell numbers", x = "counts", y = "", fill = "") + 
   theme(
-    panel.grid.major = element_blank(),  # 去掉白色网格线
-    panel.grid.minor = element_blank(),  # 去掉次要网格线
-    panel.background = element_blank(),  # 去掉灰色背景
-    axis.line = element_line(colour = "black"),  # 坐标轴为黑色（非红色）
+    panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank(),  
+    panel.background = element_blank(), 
+    axis.line = element_line(colour = "black"), 
     axis.text.y = element_text(size = 10, hjust = 0),
     legend.position="none"
   )
@@ -237,12 +216,10 @@ ggplot(df_temp, aes(x = umap_1, y = umap_2, color = `Aucell`)) +
 
 
 
-# 将 MSC 改为 Epithelial_cells
 df_temp$celltype[df_temp$celltype == "MSC"] <- "Epithelial_cells"
 df_temp$celltype[df_temp$celltype == "Monocyte"] <- "Macrophage"
 df_temp$celltype[df_temp$celltype == "Tissue_stem_cells" ] <- "Fibroblasts"
 
-# 定义自定义的颜色
 colors <- c("B_cell" = "#66c2a5", 
             "Endothelial_cells" = "#fc8d62", 
             "Epithelial_cells" = "#8da0cb", 
@@ -303,8 +280,6 @@ print(DimPlot(pbmc_epi, reduction = "umap", label = F, raster = FALSE, cols = se
 
 
 ##########g
-
-
 samples <- list.files(path="/home/zhangxp/testt/copycakt2/", pattern = "*_copykat_prediction.txt", full.names = F)
 
 first_file <- paste0("/home/zhangxp/testt/copycakt2/", samples[1])
@@ -325,8 +300,6 @@ pbmc_epi <- AddMetaData(pbmc_epi, metadata = malignant)
 table(pbmc_epi$copykat.pred)
 
 pbmc_epi$copykat.pred[pbmc_epi$copykat.pred == "c1:diploid:low.conf" | pbmc_epi$copykat.pred == "c2:aneuploid:low.conf"] <- "not.defined"
-
-# 查看更新后的结果
 table(pbmc_epi$copykat.pred)
 
 ##############H,I
@@ -357,10 +330,6 @@ ggplot(data.frame(pbmc_epi@meta.data, pbmc_epi@reductions$umap@cell.embeddings),
   theme(plot.title = element_text(hjust = 0.5))
 
 
-
-
-
-
 df_temp <- data.frame(pbmc_epi@meta.data);
 df_temp <- subset(df_temp, df_temp$copykat.pred != "not.defined")
 
@@ -368,12 +337,8 @@ df_temp <- subset(df_temp, df_temp$copykat.pred != "not.defined")
 df_temp <- df_temp%>%
   mutate(group = str_split(orig.ident, "_", simplify = TRUE)[, 2]) 
 
-
 df_temp$group <- paste(df_temp$copykat.pred, "_", df_temp$group)
 table(df_temp$group)
-
-
-# 定义自定义的颜色
 colors <- c("aneuploid _ ER" = "#66c2a5", 
             "aneuploid _ TN" = "#fc8d62", 
             "diploid _ ER" = "#8da0cb", 
@@ -407,15 +372,8 @@ p <- ggplot(df_temp, aes(x = group, y = `AUC`, fill = group)) +
               step_increase = 0.15)
 p
 
-
-
-# 提取 pbmc_epi 中的细胞名称
 cells_epi <- colnames(pbmc_epi)
-
-# 使用相同的细胞名过滤 pbmc 对象
 pbmc_subset <- pbmc[, cells_epi]
-
-# 检查维度是否匹配
 dim(pbmc_subset)
 dim(pbmc_epi)
 
@@ -460,23 +418,18 @@ ER_vs_N_markers$gene <- rownames(ER_vs_N_markers)
 pbmc_epi.markers1 <- rbind(TN_vs_N_markers,ER_vs_N_markers)
 library(dplyr)
 
-# 统计ER_vs_N中avg_log2FC > 0 和 avg_log2FC < 0 的个数
 ER_vs_N_counts <- pbmc_epi.markers1 %>%
   filter(cluster == "ER_vs_N") %>%
   summarise(
     greater_than_0 = sum(avg_log2FC > 0),
     less_than_0 = sum(avg_log2FC < 0)
   )
-
-# 统计TN_vs_N中avg_log2FC > 0 和 avg_log2FC < 0 的个数
 TN_vs_N_counts <- pbmc_epi.markers1 %>%
   filter(cluster == "TN_vs_N") %>%
   summarise(
     greater_than_0 = sum(avg_log2FC > 0),
     less_than_0 = sum(avg_log2FC < 0)
   )
-
-# 输出结果
 print(ER_vs_N_counts)
 print(TN_vs_N_counts)
 
